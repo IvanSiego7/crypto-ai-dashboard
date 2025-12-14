@@ -1,0 +1,16 @@
+Revenue: $50.00 | Expenses: $20.00 | Profit: $30.00
+Revenue: $405.00 | Expenses: $30.00 | Profit: $375.00
+Revenue: $40.00 | Expenses: $40.00 | Profit: $0.00
+Revenue: $500.00 | Expenses: $600.00 | Profit: $-100.00
+Revenue: $5,000.00 | Expenses: $400.00 | Profit: $4,600.00
+Revenue: $50.00 | Expenses: $20.00 | Profit: $30.00
+Revenue: $400.00 | Expenses: $400.00 | Profit: $0.00
+Revenue: $500.00 | Expenses: $400.00 | Profit: $100.00
+Revenue: $5,000.00 | Expenses: $350.00 | Profit: $4,650.00
+Revenue: $20,024.00 | Expenses: $10,023.00 | Profit: $10,001.00
+Revenue: $10,023.00 | Expenses: $10,022.00 | Profit: $1.00
+Revenue: $10,023.00 | Expenses: $10,022.00 | Profit: $1.00
+Revenue: $50.00 | Expenses: $30.00 | Profit: $20.00
+Revenue: $60.00 | Expenses: $70.00 | Profit: $-10.00
+Revenue: $40.00 | Expenses: $30.00 | Profit: $10.00
+Revenue: $100.00 | Expenses: $50.00 | Profit: $50.00
