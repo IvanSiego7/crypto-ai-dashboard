@@ -1,100 +1,113 @@
 import streamlit as st
-import sqlite3
-import pandas as pd # Tool for handling tables of data
+import pandas as pd
+import plotly.express as px
+from supabase import create_client
 import feedparser
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-import time
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="Ivan's Crypto Terminal", layout="wide")
+# --- 1. SETUP HALAMAN ---
+st.set_page_config(page_title="Crypto Cloud Dashboard", layout="wide")
+st.title("☁️ Real-Time SUI Price & Sentiment")
 
-# --- FUNCTION 1: GET PRICE HISTORY (From Database) ---
-def get_price_history():
-    # Connect to the database you built on Day 3
-    conn = sqlite3.connect("crypto_history.db")
-    
-    # Read data directly into a "DataFrame" (A super-powered table)
-    # We order by timestamp so the chart goes Left -> Right
-    df = pd.read_sql_query("SELECT timestamp, price FROM prices ORDER BY timestamp", conn)
-    conn.close()
-    
-    # Convert text time to real Time Objects for the chart
+# --- 2. KONEKSI KE SUPABASE (AMAN UNTUK CLOUD) ---
+@st.cache_resource
+def init_connection():
+    try:
+        # Coba import dari file config.py (Untuk di Laptop)
+        import config
+        url = config.SUPABASE_URL
+        key = config.SUPABASE_KEY
+    except ImportError:
+        # Jika file config tidak ada, cari di "Brankas" Streamlit Cloud
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        
+    return create_client(url, key)
+
+try:
+    supabase = init_connection()
+except Exception as e:
+    st.error(f"Gagal koneksi database: {e}")
+    st.stop()
+
+# --- 3. FUNGSI AMBIL DATA HARGA ---
+def get_data_from_cloud():
+    response = supabase.table('prices').select("*").order('created_at', desc=True).limit(100).execute()
+    data = response.data
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    df = df.rename(columns={'created_at': 'timestamp'})
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
-    # Set the time as the "Index" (the X-axis)
-    df = df.set_index('timestamp')
+    df = df.sort_values('timestamp')
     return df
 
-# --- FUNCTION 2: GET NEWS SENTIMENT (From RSS) ---
+# --- 4. FUNGSI AMBIL BERITA (VADER) ---
 def get_news_sentiment():
+    rss_url = "https://cointelegraph.com/rss/tag/bitcoin"
+    feed = feedparser.parse(rss_url)
     analyzer = SentimentIntensityAnalyzer()
-    # Add your custom crypto dictionary here if you want
-    new_words = {'bullish': 2.0, 'bearish': -2.0, 'moons': 2.0, 'rekt': -2.0}
-    analyzer.lexicon.update(new_words)
     
-    feed = feedparser.parse("https://cointelegraph.com/rss")
-    
-    articles = []
-    total_score = 0
-    
-    # Analyze top 5 only (to keep it fast)
-    for i in range(5):
-        entry = feed.entries[i]
-        score = analyzer.polarity_scores(entry.title)['compound']
-        total_score += score
+    news_items = []
+    for entry in feed.entries[:5]:
+        title = entry.title
+        score = analyzer.polarity_scores(title)['compound']
         
-        icon = "⚪"
-        if score > 0.05: icon = "🟢"
-        elif score < -0.05: icon = "🔴"
+        # Tentukan label emosi
+        if score > 0.05: sentiment = "🟢 Bullish"
+        elif score < -0.05: sentiment = "🔴 Bearish"
+        else: sentiment = "⚪ Neutral"
             
-        articles.append(f"{icon} **{score:.2f}**: [{entry.title}]({entry.link})")
-        
-    avg_score = total_score / 5
-    return avg_score, articles
-
-# --- THE LAYOUT (UI) ---
-st.title("🚀 Ivan's AI Trading Terminal")
-
-# Create two big columns
-col_price, col_news = st.columns(2)
-
-# --- LEFT COLUMN: PRICE ---
-with col_price:
-    st.subheader("💰 SUI Price History")
+        news_items.append({"title": title, "score": score, "sentiment": sentiment})
     
-    try:
-        # Load data from DB
-        df = get_price_history()
-        
-        # Get the very latest price
-        latest_price = df.iloc[-1]['price']
-        st.metric("Current Price", f"${latest_price}")
-        
-        # Draw the Line Chart
-        st.line_chart(df)
-        
-    except Exception as e:
-        st.error("⚠️ Could not read database. Is recorder.py running?")
-        st.write(e)
+    return news_items
 
-# --- RIGHT COLUMN: NEWS ---
-with col_news:
-    st.subheader("📰 AI Market Sentiment")
+# --- 5. TAMPILAN DASHBOARD ---
+
+# Kolom Kiri (Berita) dan Kanan (Grafik)
+col1, col2 = st.columns([1, 2]) # Kiri kecil, Kanan besar
+
+with col1:
+    st.header("📰 Market Mood")
+    news_data = get_news_sentiment()
     
-    if st.button("🔄 Analyze News"):
-        with st.spinner("Reading Cointelegraph..."):
-            score, headlines = get_news_sentiment()
-        
-        # Sentiment Gauge
-        if score > 0.05:
-            st.success(f"BULLISH (+{score:.2f})")
-        elif score < -0.05:
-            st.error(f"BEARISH ({score:.2f})")
-        else:
-            st.warning(f"NEUTRAL ({score:.2f})")
-            
-        # Show Headlines
-        for h in headlines:
-            st.markdown(h)
+    # Hitung rata-rata mood
+    avg_score = sum([item['score'] for item in news_data]) / len(news_data)
+    if avg_score > 0.05:
+        st.success(f"Overall Mood: POSITIVE ({avg_score:.2f})")
+    elif avg_score < -0.05:
+        st.error(f"Overall Mood: NEGATIVE ({avg_score:.2f})")
     else:
-        st.info("Click button to scan news.")
+        st.info(f"Overall Mood: NEUTRAL ({avg_score:.2f})")
+        
+    for item in news_data:
+        st.markdown(f"**{item['sentiment']}**")
+        st.caption(item['title'])
+        st.divider()
+
+with col2:
+    st.header("📈 SUI Price Action")
+    
+    # Tombol Refresh
+    if st.button('🔄 Refresh Data'):
+        st.rerun()
+
+    # Load Data Database
+    df = get_data_from_cloud()
+
+    if not df.empty:
+        latest_price = df.iloc[-1]['price']
+        
+        # Hitung perubahan harga (biar keren)
+        if len(df) > 1:
+            prev_price = df.iloc[-2]['price']
+            delta = latest_price - prev_price
+        else:
+            delta = 0
+            
+        st.metric(label="SUI/USDT", value=f"${latest_price}", delta=f"{delta:.4f}")
+        
+        fig = px.line(df, x='timestamp', y='price', title='Live Data from Supabase')
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Belum ada data di database. Jalankan recorder!")
