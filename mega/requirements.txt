@@ -4,3 +4,4 @@ feedparser
 vaderSentiment
 supabase
 plotly
+google-genai
