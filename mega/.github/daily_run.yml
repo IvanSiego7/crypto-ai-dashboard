@@ -1,0 +1,37 @@
+name: Crypto Bot Auto-Runner
+
+# JADWAL KERJA (TRIGGER)
+on:
+  # 1. Jalan setiap jam (Cron Job)
+  schedule:
+    - cron: '0 * * * *'  # Menit ke-0 setiap jam
+  # 2. Boleh dijalankan manual (tombol klik) untuk ngetes
+  workflow_dispatch:
+
+jobs:
+  run-robot:
+    runs-on: ubuntu-latest  # Sewa komputer Linux terbaru
+
+    steps:
+      # Langkah 1: Ambil kode dari repository kita
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Langkah 2: Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # Langkah 3: Install Library (Supabase, Requests, dll)
+      - name: Install libraries
+        run: |
+          pip install requests supabase urllib3
+
+      # Langkah 4: Jalankan Robot
+      - name: Run the Bot
+        env:
+          # Ambil kunci dari brankas GitHub Secrets
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python mega/bot.py
